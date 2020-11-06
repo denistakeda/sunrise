@@ -1,0 +1,14 @@
+.tabs {
+  display: flex;
+  flex-direction: row;
+  background-color: #eee;
+  margin-bottom: 1rem;
+}
+.tab {
+  padding: 1rem;
+  cursor: pointer;
+}
+.tab.selected,
+.tab:hover {
+  background-color: #ddd;
+}
