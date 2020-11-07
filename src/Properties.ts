@@ -11,7 +11,7 @@
  *     ]),
  * ])
  */
-import { Value, doWith, isCell, history, map } from './Cell'
+import { Value, isCell, history, formula } from './Cell'
 
 /**
  * Property is just a mutable transformation over HTMLElement
@@ -26,7 +26,7 @@ export type Property<T extends HTMLElement> = (element: T) => void
 const createBooleanProperty = (attrName: string, truthyValue: string) => (
     truthy: Value<boolean>
 ) => (element: HTMLElement) => {
-    doWith(isSelected => {
+    formula(isSelected => {
         if (isSelected) {
             element.setAttribute(attrName, truthyValue)
         } else {
@@ -37,22 +37,22 @@ const createBooleanProperty = (attrName: string, truthyValue: string) => (
 
 const createStringAttr = (attrName: string) => (value: Value<string>) => (
     element: HTMLElement
-) => doWith(value => element.setAttribute(attrName, value), value)
+) => formula(value => element.setAttribute(attrName, value), value)
 
 const createProperty = <T extends HTMLElement, K extends keyof T>(propName: K) => (value: Value<T[K]>) => (
     element: T
-) => doWith(value => element[propName] = value, value)
+) => formula(value => element[propName] = value, value)
 
 // -- Some useful properties --
 
 export const className = (name: Value<string>) => (element: HTMLElement) =>
-    doWith(name => (element.className = name), name)
+    formula(name => (element.className = name), name)
 
 export const classList = (classes: { [key: string]: Value<boolean> }) => (
     element: HTMLElement
 ) => {
     for (let [name, val] of Object.entries(classes)) {
-        doWith(value => {
+        formula(value => {
             if (value) {
                 element.classList.add(name)
             } else {
@@ -65,7 +65,7 @@ export const classList = (classes: { [key: string]: Value<boolean> }) => (
 export const muted: (
     isMuted: Value<boolean>
 ) => Property<HTMLVideoElement> = isMuted => element => {
-    doWith(isMuted => {
+    formula(isMuted => {
         if (isMuted) {
             element.setAttribute('muted', '')
             element.muted = true
@@ -95,7 +95,7 @@ export const id: (
 export const hide: (
     shouldBeHidden: Value<boolean>
 ) => Property<HTMLElement> = shouldBeHidden => element => {
-    doWith(shouldBeHidden => {
+    formula(shouldBeHidden => {
         if (shouldBeHidden) {
             element.classList.add('hide')
         } else {
@@ -122,26 +122,26 @@ export const checked: (
 export const onClick: (
     fn: Value<() => void>
 ) => Property<HTMLElement> = fn => element =>
-    doWith(fn => (element.onclick = fn), fn)
+    formula(fn => (element.onclick = fn), fn)
 
 export const onChange: (
     fn: Value<(evt: Event) => void>
 ) => Property<
     HTMLSelectElement | HTMLInputElement | HTMLTextAreaElement
-> = fn => element => doWith(fn => (element.onchange = fn), fn)
+> = fn => element => formula(fn => (element.onchange = fn), fn)
 
 export function children<T extends Node>(
     chld: Value<Value<T>[]>
 ): Property<HTMLElement> {
     return element => {
-        doWith(chld => {
+        formula(chld => {
             // TODO: this property is not efficient
             while (element.lastChild) {
                 element.removeChild(element.lastChild)
             }
             for (let child of chld) {
                 if (isCell(child)) {
-                    map(([newChild, oldChild]: [T, T | undefined]) => {
+                    formula(([newChild, oldChild]: [T, T | undefined]) => {
                         if (!oldChild) {
                             element.appendChild(newChild)
                         } else {
@@ -159,7 +159,7 @@ export function children<T extends Node>(
 export const srcObject: (
     value: Value<MediaStream | undefined>
 ) => Property<HTMLVideoElement> = value => element => {
-    doWith(value => (element.srcObject = value ?? null), value)
+    formula(value => (element.srcObject = value ?? null), value)
 }
 
 export const value: (
@@ -170,15 +170,15 @@ export const value: (
     | HTMLInputElement
     | HTMLTextAreaElement
 > = val => element =>
-    doWith(val => {
+    formula(val => {
         if (val) {
             element.value = val
         } else {
-            delete element.value
+            element.value = ''
         }
     }, val)
 
 export const text: (
     innerText: Value<string>
 ) => Property<HTMLElement> = innerText => element =>
-    doWith(innerText => (element.innerText = innerText), innerText)
+    formula(innerText => (element.innerText = innerText), innerText)

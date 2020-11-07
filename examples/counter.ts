@@ -1,5 +1,5 @@
 import { div, button, span } from '../src/Nodes'
-import { cell, swap, map } from '../src/Cell'
+import { cell, swap, formula } from '../src/Cell'
 import { onClick, text, children } from '../src/Properties'
 
 export const counter = () => {
@@ -9,7 +9,7 @@ export const counter = () => {
   return div([
     children([
       button([onClick(() => swap(dec, val)), text('-')]),
-      span([text(map(String, val))]),
+      span([text(formula(String, val))]),
       button([onClick(() => swap(inc, val)), text('+')])
     ])
   ])
