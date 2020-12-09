@@ -1,7 +1,6 @@
-import { div, input } from '../src/Nodes'
+import { div, input, renderIf } from '../src/Dom'
 import { cell, swap } from '../src/Cell'
 import { onClick, text, children, className, inputType, checked } from '../src/Properties'
-import { renderIf } from '../src/Utils'
 
 export const showHide = () => {
   const show = cell<boolean>(true)

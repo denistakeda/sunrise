@@ -1,4 +1,4 @@
-import { div } from '../src/Nodes'
+import { div } from '../src/Dom'
 
 interface TodoItem {
     text: string

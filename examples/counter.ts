@@ -1,4 +1,4 @@
-import { div, button, span } from '../src/Nodes'
+import { div, button, span } from '../src/Dom'
 import { cell, swap, formula } from '../src/Cell'
 import { onClick, text, children } from '../src/Properties'
 

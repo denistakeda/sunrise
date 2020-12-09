@@ -131,7 +131,7 @@ export const onChange: (
 > = fn => element => formula(fn => (element.onchange = fn), fn)
 
 export function children<T extends Node>(
-    chld: Value<Value<T>[]>
+    chld: Value<Array<Value<T>>>
 ): Property<HTMLElement> {
     return element => {
         formula(chld => {
@@ -143,9 +143,9 @@ export function children<T extends Node>(
                 if (isCell(child)) {
                     formula(([newChild, oldChild]: [T, T | undefined]) => {
                         if (!oldChild) {
-                            element.appendChild(newChild)
+                            formula(newChild => element.appendChild(newChild), newChild)
                         } else {
-                            element.replaceChild(newChild, oldChild)
+                            formula((newChild, oldChild) => element.replaceChild(newChild, oldChild), newChild, oldChild)
                         }
                     }, history(child))
                 } else {

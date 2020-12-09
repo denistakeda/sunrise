@@ -1,4 +1,4 @@
-import { div } from '../src/Nodes'
+import { div, sunrise } from '../src/Dom'
 import { className, onClick, text, children, classList } from '../src/Properties'
 import { cell, formula, reset } from '../src/Cell'
 import { counter } from './counter'
@@ -44,4 +44,4 @@ const main = () => {
   ])
 }
 
-document.body.appendChild(main())
+sunrise(document.getElementById('app'), main())
