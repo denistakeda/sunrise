@@ -10,7 +10,7 @@ export const showHide = () => {
     className('main'),
     children([
       input([inputType('checkbox'), onClick(() => swap(toggle, show)), checked(show)]),
-      renderIf(show, () => div([text(':-)')]))
-    ])
+      renderIf(show, () => div([text(':-)')])),
+    ]),
   ])
 }

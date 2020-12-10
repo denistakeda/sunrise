@@ -9,7 +9,7 @@ type Tab = 'counter' | 'showHide' | 'todolist'
 const tabs: { [key in Tab]: string } = {
   counter: 'Increment',
   showHide: 'Show/Hide',
-  todolist: 'Todolist'
+  todolist: 'Todolist',
 }
 
 const main = () => {
@@ -23,14 +23,14 @@ const main = () => {
           Object.entries(tabs).map(([tab, name]) =>
             div([
               className('tab'),
-              classList({ selected: formula(current => current === tab, current) }),
+              classList({ selected: formula((current) => current === tab, current) }),
               text(name),
-              onClick(() => reset(tab as Tab, current))
+              onClick(() => reset(tab as Tab, current)),
             ])
           )
-        )
+        ),
       ]),
-      formula(current => {
+      formula((current) => {
         switch (current) {
           case 'counter':
             return counter()
@@ -39,8 +39,8 @@ const main = () => {
           case 'todolist':
             return todolist()
         }
-      }, current)
-    ])
+      }, current),
+    ]),
   ])
 }
 

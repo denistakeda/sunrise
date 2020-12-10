@@ -10,7 +10,7 @@ export const counter = () => {
     children([
       button([onClick(() => swap(dec, val)), text('-')]),
       span([text(formula(String, val))]),
-      button([onClick(() => swap(inc, val)), text('+')])
-    ])
+      button([onClick(() => swap(inc, val)), text('+')]),
+    ]),
   ])
 }
