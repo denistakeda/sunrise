@@ -49,3 +49,13 @@ export function renderIf<T extends Node>(
     }
   }, show)
 }
+
+export function renderList<Item, T>(
+  fn: (item: Item) => Value<T>,
+  list: Value<Array<Item>>
+): FormulaCell<Array<Value<T>>> {
+  // TODO: we need to implement an efficient algorithm of lists comparisons here
+  return formula((list) => {
+    return list.map(fn)
+  }, list)
+}

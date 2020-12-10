@@ -116,11 +116,18 @@ export const onClick: (fn: Value<() => void>) => Property<HTMLElement> = (fn) =>
   formula((fn) => (element.onclick = fn), fn)
 
 export const onChange: (
-  fn: Value<(evt: Event) => void>
+  fn: Value<(value: string) => void>
 ) => Property<HTMLSelectElement | HTMLInputElement | HTMLTextAreaElement> = (fn) => (element) =>
-  formula((fn) => (element.onchange = fn), fn)
+  formula(
+    (fn) =>
+      (element.onchange = (e: Event) => {
+        const value = (e.target as any).value
+        if (value) fn(value)
+      }),
+    fn
+  )
 
-export function children<T extends Node>(chld: Value<Array<Value<T>>>): Property<HTMLElement> {
+export function children(chld: Value<Array<Value<Node>>>): Property<HTMLElement> {
   return (element) => {
     formula((chld) => {
       // TODO: this property is not efficient
@@ -129,7 +136,7 @@ export function children<T extends Node>(chld: Value<Array<Value<T>>>): Property
       }
       for (let child of chld) {
         if (isCell(child)) {
-          formula(([newChild, oldChild]: [T, T | undefined]) => {
+          formula(([newChild, oldChild]: [Node, Node | undefined]) => {
             if (!oldChild) {
               formula((newChild) => element.appendChild(newChild), newChild)
             } else {
