@@ -133,7 +133,8 @@ export function formula<T>(fn: Function, ...sources: Value<any>[]): FormulaCell<
 
 // -- Destruction --
 
-export function destroy<T>(cell: Cell<T>): void {
+export function destroy<T>(cell: Value<T>): void {
+  if (!isCell(cell)) return
   cell.subs.forEach(destroy)
   cell.subs.clear()
   if (cell.kind === FORMULA_CELL) {

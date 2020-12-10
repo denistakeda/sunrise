@@ -1,5 +1,5 @@
 import { Property } from './Properties'
-import { Value, Cell, FormulaCell, formula, cell, SourceCell } from './Cell'
+import { Value, Cell, deref, FormulaCell, formula, cell, SourceCell, destroy } from './Cell'
 
 export interface Component<T extends HTMLElement> {
   readonly element: T
@@ -8,7 +8,7 @@ export interface Component<T extends HTMLElement> {
 export function node<K extends keyof HTMLElementTagNameMap>(
   tag: K
 ): (attributes: Property<HTMLElementTagNameMap[K]>[]) => SourceCell<HTMLElementTagNameMap[K]> {
-  return function(attributes) {
+  return function (attributes) {
     const element = document.createElement(tag)
     for (const attr of attributes) {
       attr(element)
@@ -27,24 +27,25 @@ export const input = node('input')
 
 export function sunrise(to: HTMLElement | null, el: Value<Element>): void {
   if (!to) return
-  formula(el => to.parentElement?.replaceChild(el, to), el)
+  formula((el) => to.parentElement?.replaceChild(el, to), el)
 }
 
 // -- Rendering utils --
 
 const emptyElement: Node = document.createTextNode('')
 
-// export function renderIf<T extends Node>(show: boolean, el: Value<T> | (() => Value<T>)): T
-// export function renderIf<T extends Node>(show: Cell<boolean>, el: Value<T> | (() => Value<T>)): FormulaCell<T>
-// export function renderIf<T extends Node>(
-//   show: Value<boolean>,
-//   el: T | (() => T)
-// ): T | FormulaCell<T> {
-//   const getElement: () => T = typeof el === 'function' ? el : () => el
-//   const getElementIf: (show: boolean) => T = show => (show ? getElement() : (emptyElement as T))
-//   return formula<boolean, T>(getElementIf, show)
-// }
-
-export function renderIf<T extends Node>(show: Cell<boolean>, el: Value<T>): FormulaCell<Node> {
-  return formula((show, el) => show ? el : emptyElement, show, el);
+export function renderIf<T extends Node>(
+  show: Cell<boolean>,
+  fn: () => Value<T>
+): FormulaCell<Node> {
+  let el: Value<T>
+  return formula((show) => {
+    if (show) {
+      el = fn()
+      return deref(el)
+    } else {
+      destroy(el)
+      return emptyElement
+    }
+  }, show)
 }
