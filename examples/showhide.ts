@@ -1,7 +1,6 @@
-import { div, input } from '../src/Nodes'
+import { div, input, renderIf } from '../src/Dom'
 import { cell, swap } from '../src/Cell'
 import { onClick, text, children, className, inputType, checked } from '../src/Properties'
-import { renderIf } from '../src/Utils'
 
 export const showHide = () => {
   const show = cell<boolean>(true)
@@ -11,7 +10,7 @@ export const showHide = () => {
     className('main'),
     children([
       input([inputType('checkbox'), onClick(() => swap(toggle, show)), checked(show)]),
-      renderIf(show, () => div([text(':-)')]))
-    ])
+      renderIf(show, () => div([text(':-)')])),
+    ]),
   ])
 }
