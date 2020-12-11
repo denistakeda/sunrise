@@ -1,4 +1,4 @@
-import { div, renderIf } from '../src/Dom'
+import { div, renderIf, renderList } from '../src/Dom'
 import { cell, deref, isDestroyed, reset } from '../src/Cell'
 
 describe('renderIf', () => {
@@ -36,5 +36,15 @@ describe('renderIf', () => {
     expect(fn).not.toBeCalled()
     reset(true, flag)
     expect(fn).toBeCalled()
+  })
+})
+
+describe('renderList', () => {
+  it('should create a cell of list', () => {
+    const list = cell<string[]>(['a', 'aa', 'aaa'])
+    const fn = jest.fn(s => s.length)
+    const result = renderList(fn, list)
+    expect(fn).toBeCalledTimes(3)
+    expect(deref(result)).toHaveLength(3)
   })
 })
