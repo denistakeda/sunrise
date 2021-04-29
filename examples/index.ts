@@ -1,4 +1,4 @@
-import { div, sunrise } from '../src/Dom'
+import { div, sunrise, renderSwitch } from '../src/Dom'
 import { className, onClick, text, children, classList } from '../src/Properties'
 import { cell, formula, reset } from '../src/Cell'
 import { counter } from './counter'
@@ -30,7 +30,7 @@ const main = () => {
           )
         ),
       ]),
-      formula((current) => {
+      renderSwitch((current) => {
         switch (current) {
           case 'counter':
             return counter()

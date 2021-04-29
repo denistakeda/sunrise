@@ -32,22 +32,44 @@ export function sunrise(to: HTMLElement | null, el: Value<Element>): void {
 
 // -- Rendering utils --
 
-const emptyElement: Node = document.createTextNode('')
+function replaceNode<T extends Node>(newNode: Value<T>, oldNode: Value<T>): void {
+  const oldEl = deref(oldNode)
+  oldEl.parentElement?.replaceChild(deref(newNode), oldEl)
+  destroy(oldEl)
+}
+
+export function renderSwitch<V, N extends Node>(
+  render: (source: V) => Value<N>,
+  cell: Value<V>,
+): FormulaCell<N> {
+  let oldNode: Value<N>
+  return formula(source => {
+    const newNode = render(source)
+    if (oldNode) replaceNode(newNode, oldNode)
+    oldNode = newNode
+    return deref(oldNode)
+  }, cell)
+}
 
 export function renderIf<T extends Node>(
-  show: Cell<boolean>,
-  fn: () => Value<T>
+  fn: () => Value<T>,
+  show: Value<boolean>,
 ): FormulaCell<Node> {
-  let el: Value<T>
-  return formula((show) => {
-    if (show) {
-      el = fn()
-      return deref(el)
-    } else {
-      destroy(el)
-      return emptyElement
-    }
-  }, show)
+  return renderSwitch(
+    show => show ? fn() : document.createTextNode(''),
+    show
+  )
+}
+
+export function renderSomething<T, N extends Node>(
+  fn: (source: T) => Value<N>,
+  cell: Value<T | undefined | null>,
+): FormulaCell<Node> {
+  return renderSwitch(
+    source =>
+      source !== undefined && source !== null ? fn(source) : document.createTextNode(''),
+    cell
+  )
 }
 
 export function renderList<Item, T>(
