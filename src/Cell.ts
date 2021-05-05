@@ -308,7 +308,7 @@ export const map = formula
  * Accepts a cell and creates a cell of tuple [newValue, oldValue]
  * initially oldValue is undefined
  */
-export function history<T>(cell: Cell<T>): FormulaCell<[T, T | undefined]> {
+export function history<T>(cell: Value<T>): FormulaCell<[T, T | undefined]> {
   let oldVal: T | undefined = undefined
   return formula((newVal) => {
     const result: [T, T | undefined] = [newVal, oldVal]
