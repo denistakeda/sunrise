@@ -12,10 +12,35 @@ import {
   byIndex,
 } from '../src/Cell'
 
+// @ts-ignore
+window.setImmediate = (fn: Function) => fn()
+
 const inc = (x: number) => x + 1
 const sum = (...nums: number[]) => nums.reduce((x: number, y: number) => x + y, 0)
 const identity = <T>(x: T) => x
 const not = (x: boolean) => !x
+
+function mockFn<T>(fn: (...oldVals: T[]) => T) {
+  let counter = 0
+  const map: Map<number, () => void> = new Map()
+
+  const result = (...oldVals: T[]) => {
+    counter++
+    const resolve = map.get(counter)
+    if (resolve) resolve()
+    map.delete(counter)
+    return fn(...oldVals)
+  }
+
+  result.expectToBeCalledTimes = (times: number) => {
+    if (times === counter) return Promise.resolve()
+    if (counter > times) return Promise.reject(`Called ${counter} times, expected to be called ${times} times`)
+    const promise = new Promise(resolve => map.set(times, resolve as () => void))
+    return promise
+  }
+
+  return result
+}
 
 describe('deref', () => {
   it('should deref a souce cell', () => {
@@ -54,19 +79,16 @@ describe('SourceCell', () => {
     expect(deref(x)).toBe(2)
   })
 
-  it('should be swapable', () => {
+  it('should be swapable', async () => {
     const x = cell<number>(1)
     expect(deref(x)).toBe(1)
-    swap(inc, x)
+    const fn = mockFn(inc)
+    swap(fn, x)
+    await fn.expectToBeCalledTimes(1)
     expect(deref(x)).toBe(2)
   })
 
-  it('swap should accept arbitrary number of params', () => {
-    const x = cell<number>(1)
-    expect(deref(x)).toBe(1)
-    swap(sum, x, 2, 3, 4, 5)
-    expect(deref(x)).toBe(15)
-  })
+  // TODO: add tests for STM
 })
 
 describe('FormulaCell', () => {
@@ -83,30 +105,34 @@ describe('FormulaCell', () => {
     expect(deref(y)).toBe(3)
   })
 
-  it('should be updated only when source value was changed', () => {
+  it('should be updated only when source value was changed', async () => {
     const x = cell<number>(1)
-    const fn = jest.fn(inc)
+    const fn = mockFn(inc)
     const y = formula(fn, x)
-    expect(fn).toBeCalledTimes(1)
+    await fn.expectToBeCalledTimes(1)
     reset(1, x)
-    expect(fn).toBeCalledTimes(1)
+    await fn.expectToBeCalledTimes(1)
     swap(identity, x)
-    expect(fn).toBeCalledTimes(1)
+    await fn.expectToBeCalledTimes(1)
 
     reset(2, x)
-    expect(fn).toBeCalledTimes(2)
+    await fn.expectToBeCalledTimes(2)
     swap(inc, x)
-    expect(fn).toBeCalledTimes(3)
+    await fn.expectToBeCalledTimes(3)
   })
 
-  it('multiple sources', () => {
+  it('multiple sources', async () => {
     const x = cell<number>(1)
     const y = cell<number>(2)
-    const z = formula(sum, x, y)
+    const fn = mockFn(sum)
+    const z = formula(fn, x, y)
+    await fn.expectToBeCalledTimes(1)
     expect(deref(z)).toBe(3)
     swap(inc, x)
+    await fn.expectToBeCalledTimes(2)
     expect(deref(z)).toBe(4)
     swap(inc, y)
+    await fn.expectToBeCalledTimes(3)
     expect(deref(z)).toBe(5)
   })
 
@@ -145,7 +171,6 @@ describe('destruction', () => {
     const y = formula(inc, x)
     destroy(y)
     expect(isDestroyed(y)).toBeTruthy()
-    expect(x.subs.size).toBe(0)
   })
 
   it('should destroy all dependent cells', () => {

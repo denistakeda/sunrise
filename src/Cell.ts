@@ -1,94 +1,230 @@
-// -- Constants --
-
-const SOURCE_CELL = 'source-cell'
-const FORMULA_CELL = 'formula-cell'
-
-// -- Maind Definitions --
-
-export type Cell<T> = SourceCell<T> | FormulaCell<T>
-export type Value<T> = T | Cell<T>
-
-export function isCell<T>(val: Value<T>): val is Cell<T> {
-  return (
-    val instanceof Object &&
-    'kind' in val &&
-    (val.kind === SOURCE_CELL || val.kind === FORMULA_CELL)
-  )
-}
+import 'core-js/fn/set'
 
 // -- Deref --
 
-interface Dereferencable<T> {
-  val: T
-  destroyed?: boolean
+export interface Dereferencable<T> {
+    deref(): T
 }
 
-export function deref<T>(x: T | Dereferencable<T>): T {
-  if (x instanceof Object && x.hasOwnProperty('val')) {
-    if (x.destroyed) throw new Error('Impossible to deref a destroyed cell')
-    return x.val
-  } else {
-    return x as T
-  }
+export function isDereferencable<T>(val: Dereferencable<T> | T): val is Dereferencable<T> {
+  return val instanceof Object && 'deref' in val
+}
+
+export function deref<T>(val: Dereferencable<T> | T): T {
+    if (isDereferencable(val)) {
+        return val.deref()
+    } else {
+        return val
+    }
+}
+
+// -- Destroy --
+
+export interface Destroyable {
+    destroy(): void
+    isDestroyed(): boolean
+}
+
+export function isDestroyable<T>(val: any): val is Destroyable {
+  return val instanceof Object && 'destroy' in val && 'isDestroyed' in val
+}
+
+export function destroy(val: any): void {
+    if (isDestroyable(val)) {
+        val.destroy()
+    }
+}
+
+export function isDestroyed(val:Cell<any>): boolean {
+  return val.isDestroyed()
+}
+
+// ------------
+
+export interface Recalculable {
+    recalculate(): void
 }
 
 // -- Subscriptions --
 
-interface Subscribable<T> extends Dereferencable<T> {
-  readonly subs: Set<FormulaCell<any>>
+export interface Subscribable {
+    subscribe(subscriber: Recalculable & Destroyable): void
+    unsubscribe(subscriber: Recalculable & Destroyable): void
 }
 
-function subscribe<T>(sub: FormulaCell<any>, target: Subscribable<T>): void {
-  target.subs.add(sub)
+export function isSubscribable(val: any): val is Subscribable {
+  return val instanceof Object && 'subscribe' in val && 'unsubscribe' in val
 }
 
-function unsubscribe<T>(sub: FormulaCell<any>, target: Subscribable<T>): void {
-  target.subs.delete(sub)
+export function subscribe(subscriber: Recalculable & Destroyable, val: any): void {
+  if (isSubscribable(val))
+        val.subscribe(subscriber)
 }
 
-function notify<T>(target: Subscribable<T>): void {
-  target.subs.forEach(recalculate)
+export function unsubscribe(subscriber: Recalculable & Destroyable, val: any): void {
+  if (isSubscribable(val))
+        val.unsubscribe(subscriber)
 }
+
+// ------------------
+
+export interface Cell<T> extends Dereferencable<T>, Destroyable, Subscribable {}
+
+export type Value<T> = T | Cell<T>
+
+export function isCell<T>(val: Value<T>): val is Cell<T> {
+  return isDereferencable(val) && isDestroyable(val) && isSubscribable(val)
+}
+
+// ------------------
+
 
 // -- Source Cell --
 
-export interface SourceCell<T> extends Subscribable<T> {
-  readonly kind: typeof SOURCE_CELL
+
+export class OperationOnDestroyedCellError extends Error {}
+
+export class SourceCell<T> implements Cell<T> {
+
+    // undefined means the cell was destroyed
+    private val: T
+    private destroyed: boolean = false
+    private subs = new Set<Recalculable & Destroyable>()
+
+    constructor(val: T) {
+        this.val = val
+    }
+
+    public deref(): T {
+        if (this.destroyed) throw new OperationOnDestroyedCellError('Impossible to deref a destroyed cell')
+        return this.val
+    }
+
+    public destroy(): void {
+        this.destroyed = true
+        for (let subscriber of this.subs) {
+            subscriber.destroy()
+        }
+        this.subs.clear()
+    }
+
+    public isDestroyed(): boolean {
+        return this.destroyed
+    }
+
+    public subscribe(subscriber: Recalculable & Destroyable): void {
+        if (this.destroyed) throw new OperationOnDestroyedCellError('Impossible to subscribe a destroyed cell')
+        this.subs.add(subscriber)
+    }
+
+    public unsubscribe(subscriber: Recalculable & Destroyable): void {
+        this.subs.delete(subscriber)
+    }
+
+    public reset(val: T): void {
+        if (this.val === val) return
+        this.val = val
+        this.notifySubscribers()
+    }
+
+    public swap(fn: (oldVal: T) => T): void {
+        if (this.destroyed) throw new OperationOnDestroyedCellError('Impossible to swap a destroyed cell')
+        const oldVal = this.val
+        setImmediate(() => {
+            const newVal = fn(oldVal)
+            // STM is implemented here. Apply changes only if the value didn't change while we
+            // were doing calculations. Otherwise start from the very beginning
+            if (oldVal === this.val) {
+                this.reset(newVal)
+            } else {
+                this.swap(fn)
+            }
+        })
+    }
+
+    private notifySubscribers(): void {
+        if (this.destroyed) return
+
+        for (let subscriber of this.subs) {
+            subscriber.recalculate()
+        }
+    }
 }
 
 export function cell<T>(val: T): SourceCell<T> {
-  return { kind: SOURCE_CELL, val, subs: new Set() }
+    return new SourceCell(val)
 }
 
-export function reset<T>(newVal: T, sc: SourceCell<T>): void {
-  if (sc.val === newVal) return
-  sc.val = newVal
-  notify(sc)
+export function reset<T>(val: T, cell: SourceCell<T>): void {
+    cell.reset(val)
 }
 
-type Arr = readonly unknown[]
-
-export function swap<T, S extends Arr>(
-  f: (...args: [T, ...S]) => T,
-  sc: SourceCell<T>,
-  ...args: [...S]
-): void {
-  reset(f(deref(sc), ...args), sc)
+export function swap<T>(fn: (oldVal: T) => T, cell: SourceCell<T>): void {
+    cell.swap(fn)
 }
 
 // -- Formula Cell --
 
-export interface FormulaCell<T> extends Subscribable<T> {
-  readonly kind: typeof FORMULA_CELL
-  readonly sources: Cell<any>[]
-  readonly formula: Function
-}
+export class FormulaCell<T> implements Cell<T>, Recalculable {
 
-function recalculate<T>(fc: FormulaCell<T>): void {
-  const oldVal = fc.val
-  fc.val = fc.formula(...fc.sources.map(deref))
-  if (fc.val === oldVal) return
-  notify(fc)
+    // undefined means the cell was destroyed
+    private val: T
+    private destroyed: boolean = false
+    private readonly fn: Function
+    private readonly sources: (Cell<T> | T)[]
+    private subs = new Set<Recalculable & Destroyable>()
+
+    constructor(fn: Function, ...sources: (Cell<T> | T)[]) {
+        this.fn = fn
+        this.sources = sources
+        sources.forEach(source => subscribe(this, source))
+        this.val = this.recalculate()
+    }
+
+    public deref(): T {
+        if (this.destroyed) throw new OperationOnDestroyedCellError('Impossible to deref a destroyed cell')
+        return this.val
+    }
+
+    public recalculate(): T {
+        const newVal = this.fn(...(this.sources.map(deref)))
+        if (newVal === this.val) return this.val
+        this.val = newVal
+        this.notifySubscribers()
+        return this.val
+    }
+
+    public subscribe(subscriber: Recalculable & Destroyable): void {
+        if (this.destroyed) throw new OperationOnDestroyedCellError('Impossible to subscribe a destroyed cell')
+        this.subs.add(subscriber)
+    }
+
+    public unsubscribe(subscriber: Recalculable & Destroyable): void {
+        this.subs.delete(subscriber)
+    }
+
+    public destroy(): void {
+        for (let subscriber of this.subs) {
+            subscriber.destroy()
+        }
+        for (let source of this.sources) {
+            unsubscribe(this, source)
+        }
+        this.subs.clear()
+        this.destroyed = true
+    }
+
+    public isDestroyed(): boolean {
+        return this.destroyed
+    }
+
+    private notifySubscribers(): void {
+        if (!this.val) return
+
+        for (let subscriber of this.subs) {
+            subscriber.recalculate()
+        }
+    }
 }
 
 export function formula<F1, T>(fn: (val1: F1) => T, input1: Value<F1>): FormulaCell<T>
@@ -118,35 +254,53 @@ export function formula<F1, F2, F3, F4, F5, T>(
   input4: Value<F4>,
   input5: Value<F4>
 ): FormulaCell<T>
+export function formula<F1, F2, F3, F4, F5, F6, T>(
+  fn: (val1: F1, val2: F2, val3: F3, val4: F4, val5: F5, val6: F6) => T,
+  input1: Value<F1>,
+  input2: Value<F2>,
+  input3: Value<F3>,
+  input4: Value<F4>,
+  input5: Value<F4>,
+  input6: Value<F6>
+): FormulaCell<T>
+export function formula<F1, F2, F3, F4, F5, F6, F7, T>(
+  fn: (val1: F1, val2: F2, val3: F3, val4: F4, val5: F5, val6: F6, val7: F7) => T,
+  input1: Value<F1>,
+  input2: Value<F2>,
+  input3: Value<F3>,
+  input4: Value<F4>,
+  input5: Value<F4>,
+  input6: Value<F6>,
+  input7: Value<F7>
+): FormulaCell<T>
+export function formula<F1, F2, F3, F4, F5, F6, F7, F8, T>(
+  fn: (val1: F1, val2: F2, val3: F3, val4: F4, val5: F5, val6: F6, val7: F7, val8: F8) => T,
+  input1: Value<F1>,
+  input2: Value<F2>,
+  input3: Value<F3>,
+  input4: Value<F4>,
+  input5: Value<F4>,
+  input6: Value<F6>,
+  input7: Value<F7>,
+  input8: Value<F8>
+): FormulaCell<T>
+export function formula<F1, F2, F3, F4, F5, F6, F7, F8, F9, T>(
+  fn: (val1: F1, val2: F2, val3: F3, val4: F4, val5: F5, val6: F6, val7: F7, val8: F8, val9: F9) => T,
+  input1: Value<F1>,
+  input2: Value<F2>,
+  input3: Value<F3>,
+  input4: Value<F4>,
+  input5: Value<F4>,
+  input6: Value<F6>,
+  input7: Value<F7>,
+  input8: Value<F8>,
+  input9: Value<F9>
+): FormulaCell<T>
 export function formula<T>(fn: Function, ...sources: Value<any>[]): FormulaCell<T> {
-  const fc: FormulaCell<T> = {
-    kind: FORMULA_CELL,
-    sources,
-    formula: fn,
-    subs: new Set<FormulaCell<T>>(),
-    val: fn(...sources.map(deref)),
-  }
-  for (let source of sources) if (isCell(source)) subscribe(fc, source)
-
-  return fc
+    return new FormulaCell(fn, ...sources)
 }
 
-// -- Destruction --
-
-export function destroy<T>(cell: Value<T>): void {
-  if (!isCell(cell)) return
-  cell.subs.forEach(destroy)
-  cell.subs.clear()
-  if (cell.kind === FORMULA_CELL) {
-    cell.sources.forEach((source) => unsubscribe(cell, source))
-    cell.sources.length = 0
-  }
-  cell.destroyed = true
-}
-
-export function isDestroyed<T>(cell: Cell<T>): boolean {
-  return !!cell.destroyed
-}
+export const map = formula
 
 // -- Some helpful formula cells --
 
@@ -173,4 +327,12 @@ export function field<F, K extends keyof F>(fieldName: K, fromCell: Cell<F>): Fo
 
 export function byIndex<T>(index: number, source: Cell<T[]>): FormulaCell<T | undefined> {
   return formula((fromVal) => fromVal[index], source)
+}
+
+export function toBool(source: Cell<any>): FormulaCell<boolean> {
+    return formula(fromVal => !!fromVal, source)
+}
+
+export function not(source: Cell<any>): FormulaCell<boolean> {
+    return formula(fromVal => !fromVal, source)
 }
