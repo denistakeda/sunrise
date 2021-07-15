@@ -1,9 +1,10 @@
-import { cell, deref, formula, FormulaCell, reset, swap } from '../src/Cell'
-import { button, div, input, renderList, span } from '../src/Dom'
+import { cell, deref, formula, FormulaCell, Value, reset, swap } from '../src/Cell'
+import { button, div, input, span } from '../src/Dom'
 import {
   className,
   classList,
   children,
+  children1,
   inputType,
   text,
   onClick,
@@ -55,7 +56,10 @@ export const todolist = () => {
   return div([
     className('todolist'),
     children([
-      div([className('list'), children(renderList(todoItem, TodoList.list()))]),
+      div([
+        className('list'),
+        children1(todoItem, TodoList.list()),
+      ]),
       div([
         children([
           input([inputType('text'), value(newItem), onChange((val) => reset(val, newItem))]),
@@ -66,10 +70,12 @@ export const todolist = () => {
   ])
 }
 
-const todoItem = (item: TodoList.TodoItem) =>
-  div([
+const todoItem = (val: Value<TodoList.TodoItem>) => {
+  const item = deref(val)
+  return div([
     className('todoitem'),
     classList({ checked: item.done }),
     onClick(() => TodoList.toggle(item.id)),
     children([input([inputType('checkbox'), checked(item.done)]), span([text(item.text)])]),
   ])
+}

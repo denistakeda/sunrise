@@ -11,7 +11,8 @@
  *     ]),
  * ])
  */
-import { Value, isCell, history, formula } from './Cell'
+import { Value, isCell, history, formula, deref, destroy } from './Cell'
+import { mayers } from './Graph'
 
 /**
  * Property is just a mutable transformation over HTMLElement
@@ -128,30 +129,38 @@ export const onChange: (
   )
 
 export function children(chld: Value<Array<Value<Node>>>): Property<HTMLElement> {
-  return (element) => {
-    formula((chld) => {
-      // TODO: this property is not efficient
-      while (element.lastChild) {
-        element.removeChild(element.lastChild)
+  return element => {
+    for (let child of deref(chld)) {
+      element.appendChild(deref(child))
+    }
+  }
+}
+
+export function children1<T>(fn: (val: Value<T>) => Value<Node>, vals: Value<Array<Value<T>>>): Property<HTMLElement> {
+  return element => {
+    formula(([newList, oldList]) => {
+      if (!oldList) {
+        newList.forEach(val => element.appendChild(deref(fn(val))))
+        return
       }
-      for (let child of chld) {
-        if (isCell(child)) {
-          formula(([newChild, oldChild]: [Node, Node | undefined]) => {
-            if (!oldChild) {
-              formula((newChild) => element.appendChild(newChild), newChild)
-            } else {
-              formula(
-                (newChild, oldChild) => element.replaceChild(newChild, oldChild),
-                newChild,
-                oldChild
-              )
-            }
-          }, history(child))
-        } else {
-          element.appendChild(child)
+
+      let pos = 0
+      for (let action of mayers(oldList, newList)) {
+        switch (action.kind) {
+            case 'insert':
+              element.insertBefore(deref(fn(action.value)), element.childNodes[pos])
+              pos++
+              break
+            case 'delete':
+              element.removeChild(element.childNodes[pos])
+              destroy(action.value)
+              break
+            case 'skip':
+              pos++
+              break
         }
       }
-    }, chld)
+    }, history(vals))
   }
 }
 
